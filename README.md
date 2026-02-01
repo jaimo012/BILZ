@@ -23,14 +23,14 @@ BILZ는 Kotlin과 Jetpack Compose를 사용하여 개발된 Android 앱입니다
 | Coil | 2.7.0 | 이미지 로딩 |
 | Google Play Services Auth | 21.3.0 | Google 로그인 |
 | Google API Client | 2.7.0 | Google Drive API |
-| Android Image Cropper | 4.6.0 | 이미지 자르기 |
+| Android Image Cropper | 4.5.0 | 이미지 자르기 |
 | Kotlin Coroutines | 1.9.0 | 비동기 처리 |
 
 ## 📋 요구 사항
 
 - Android Studio Ladybug (2024.2.1) 이상
 - JDK 17 이상
-- Android SDK 34 (Android 14)
+- Android SDK 35 (Android 15)
 - 최소 지원 버전: Android 8.0 (API 26)
 
 ## 🚀 시작하기
@@ -38,7 +38,7 @@ BILZ는 Kotlin과 Jetpack Compose를 사용하여 개발된 Android 앱입니다
 ### 1. 프로젝트 클론
 
 ```bash
-git clone https://github.com/your-username/BILZ.git
+git clone https://github.com/jaimo012/BILZ.git
 cd BILZ
 ```
 
@@ -177,6 +177,12 @@ dependencies {
   - 시스템 바 색상 동기화 (상태바, 네비게이션 바)
   - 로컬 저장/드라이브 업로드 실패 시 에러 화면 표시
   - FileProvider 설정 확인 (카메라 촬영 URI 공유용)
+- 🐛 버그 수정
+  - Android Image Cropper 버전 4.6.0 → 4.5.0 (호환성)
+  - compileSdk/targetSdk 34 → 35 (androidx.core 1.15.0 요구사항)
+  - CropImageActivity AppCompat 테마 적용 (ActionBar 표시)
+  - FileProvider를 통한 안전한 URI 공유 (Android 7.0+)
+  - 글로벌 예외 처리 및 크래시 로깅 추가
 
 ## 🤝 기여하기
 
