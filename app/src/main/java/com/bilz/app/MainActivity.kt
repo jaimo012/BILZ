@@ -311,33 +311,24 @@ fun BilzApp() {
             when (val signInResult = googleAuthManager.handleSignInResult(result.data)) {
                 is GoogleSignInResult.Success -> {
                     Log.d("MainActivity", "Google 로그인 성공: ${signInResult.account.email}")
-                    Toast.makeText(context, "${signInResult.account.email}으로 로그인됨", Toast.LENGTH_SHORT).show()
-                    currentScreen = AppScreen.ReadyToUpload(
+                    // 로그인 성공 -> 바로 업로드 시작 (확인 화면 생략)
+                    currentScreen = AppScreen.Uploading(
                         savedUri = screen.savedUri,
                         fileName = screen.fileName,
-                        relativePath = screen.relativePath,
                         account = signInResult.account
                     )
                 }
                 is GoogleSignInResult.Cancelled -> {
                     Log.d("MainActivity", "Google 로그인 취소됨")
-                    Toast.makeText(context, "로그인이 취소되었습니다", Toast.LENGTH_SHORT).show()
-                    // 저장 완료 화면으로 돌아가기
-                    currentScreen = AppScreen.SaveCompleted(
-                        savedUri = screen.savedUri,
-                        fileName = screen.fileName,
-                        relativePath = screen.relativePath
-                    )
+                    Toast.makeText(context, "로그인 취소 - 로컬에만 저장됨", Toast.LENGTH_SHORT).show()
+                    // 카메라 화면으로 복귀
+                    currentScreen = AppScreen.Camera
                 }
                 is GoogleSignInResult.Failure -> {
                     Log.e("MainActivity", "Google 로그인 실패: ${signInResult.message}")
-                    Toast.makeText(context, "로그인 실패: ${signInResult.message}", Toast.LENGTH_SHORT).show()
-                    // 저장 완료 화면으로 돌아가기
-                    currentScreen = AppScreen.SaveCompleted(
-                        savedUri = screen.savedUri,
-                        fileName = screen.fileName,
-                        relativePath = screen.relativePath
-                    )
+                    Toast.makeText(context, "로그인 실패 - 로컬에만 저장됨", Toast.LENGTH_SHORT).show()
+                    // 카메라 화면으로 복귀
+                    currentScreen = AppScreen.Camera
                 }
                 is GoogleSignInResult.NeedSignIn -> {
                     // 이 경우는 발생하지 않음 (이미 로그인 결과 처리 중)
@@ -381,7 +372,7 @@ fun BilzApp() {
     }
     
     // ============================================================
-    // 저장 상태에서 이미지 저장 실행
+    // 저장 상태에서 이미지 저장 실행 -> 자동으로 업로드 진행
     // ============================================================
     
     LaunchedEffect(currentScreen) {
@@ -398,7 +389,9 @@ fun BilzApp() {
             currentScreen = when (result) {
                 is ImageSaveResult.Success -> {
                     Log.d("MainActivity", "이미지 저장 성공: ${result.savedUri}")
-                    AppScreen.SaveCompleted(
+                    Toast.makeText(context, "로컬 저장 완료! 드라이브 업로드 중...", Toast.LENGTH_SHORT).show()
+                    // 저장 완료 후 자동으로 로그인/업로드 진행
+                    AppScreen.SigningIn(
                         savedUri = result.savedUri,
                         fileName = result.displayName,
                         relativePath = result.relativePath
@@ -425,12 +418,11 @@ fun BilzApp() {
             // 로그인 시도
             when (val result = googleAuthManager.trySignIn()) {
                 is GoogleSignInResult.Success -> {
-                    // 이미 로그인되어 있음
+                    // 이미 로그인되어 있음 -> 바로 업로드 시작
                     Log.d("MainActivity", "기존 로그인 계정 사용: ${result.account.email}")
-                    currentScreen = AppScreen.ReadyToUpload(
+                    currentScreen = AppScreen.Uploading(
                         savedUri = screen.savedUri,
                         fileName = screen.fileName,
-                        relativePath = screen.relativePath,
                         account = result.account
                     )
                 }
@@ -467,19 +459,21 @@ fun BilzApp() {
                     folderId = DriveServiceHelper.BILZ_FOLDER_ID
                 )
                 
-                // 결과에 따라 화면 전환
-                currentScreen = when (result) {
+                // 결과에 따라 처리
+                when (result) {
                     is DriveUploadResult.Success -> {
                         Log.d("MainActivity", "업로드 성공: ${result.fileId}")
-                        AppScreen.UploadCompleted(
-                            fileName = result.fileName,
-                            driveFileId = result.fileId,
-                            webViewLink = result.webViewLink
-                        )
+                        // 성공 Toast 표시 후 카메라로 자동 복귀
+                        Toast.makeText(
+                            context,
+                            "✅ 저장 및 업로드 완료!",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        currentScreen = AppScreen.Camera
                     }
                     is DriveUploadResult.Failure -> {
                         Log.e("MainActivity", "업로드 실패: ${result.message}")
-                        AppScreen.UploadFailed(
+                        currentScreen = AppScreen.UploadFailed(
                             errorMessage = result.message,
                             savedUri = screen.savedUri,
                             fileName = screen.fileName,
