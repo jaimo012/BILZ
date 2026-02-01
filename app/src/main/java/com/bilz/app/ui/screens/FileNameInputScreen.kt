@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,8 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -32,7 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,33 +41,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.bilz.app.ui.components.ExpenseInputDialog
 import com.bilz.app.ui.theme.BILZTheme
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * 파일명 입력 화면 Composable
  * 
  * 크롭이 완료된 이미지의 미리보기를 표시하고,
- * 사용자가 파일명을 입력할 수 있는 화면입니다.
+ * 지출 용도 입력 다이얼로그를 통해 파일명을 설정합니다.
  * 
  * @param croppedImageUri 크롭된 이미지의 Uri
- * @param onConfirm 파일명 확정 시 호출되는 콜백 (입력된 파일명 전달)
+ * @param onConfirm 파일명 확정 시 호출되는 콜백 (생성된 파일명 전달)
  * @param onCancel 취소 버튼 클릭 시 호출되는 콜백
  * @param onRetake 다시 촬영 버튼 클릭 시 호출되는 콜백
  * @param modifier 레이아웃 수정자
@@ -85,20 +74,16 @@ fun FileNameInputScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val focusRequester = remember { FocusRequester() }
     
     // ============================================================
     // 상태 관리
     // ============================================================
     
-    // 파일명 입력 상태 (기본값: 현재 날짜/시간 기반)
-    var fileName by remember {
-        mutableStateOf(generateDefaultFileName())
-    }
+    // 다이얼로그 표시 상태 (화면 진입 시 자동으로 true)
+    var showExpenseDialog by remember { mutableStateOf(true) }
     
-    // 파일명 유효성 검사 에러 메시지
-    var fileNameError by remember { mutableStateOf<String?>(null) }
+    // 확정된 파일명
+    var confirmedFileName by remember { mutableStateOf<String?>(null) }
     
     // 애니메이션 상태
     var isVisible by remember { mutableStateOf(false) }
@@ -118,20 +103,6 @@ fun FileNameInputScreen(
         animationSpec = tween(durationMillis = 400),
         label = "scale"
     )
-    
-    // ============================================================
-    // 파일명 유효성 검사 함수
-    // ============================================================
-    
-    fun validateFileName(name: String): String? {
-        return when {
-            name.isBlank() -> "파일명을 입력해주세요"
-            name.length < 2 -> "파일명은 2자 이상이어야 합니다"
-            name.length > 50 -> "파일명은 50자 이하여야 합니다"
-            name.contains(Regex("[\\\\/:*?\"<>|]")) -> "사용할 수 없는 문자가 포함되어 있습니다"
-            else -> null
-        }
-    }
     
     // ============================================================
     // UI 구성
@@ -169,24 +140,32 @@ fun FileNameInputScreen(
                 imageUri = croppedImageUri
             )
             
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             
-            // 파일명 입력 필드
-            FileNameInputField(
-                fileName = fileName,
-                onFileNameChange = { newName ->
-                    fileName = newName
-                    fileNameError = validateFileName(newName)
-                },
-                error = fileNameError,
-                focusRequester = focusRequester,
-                onDone = {
-                    keyboardController?.hide()
-                    if (validateFileName(fileName) == null) {
-                        onConfirm(fileName)
-                    }
+            // 파일명 표시 영역 (확정된 경우)
+            if (confirmedFileName != null) {
+                FileNameDisplay(
+                    fileName = confirmedFileName!!,
+                    onEditClick = { showExpenseDialog = true }
+                )
+            } else {
+                // 파일명 미설정 안내
+                Text(
+                    text = "지출 용도를 입력해주세요",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Button(
+                    onClick = { showExpenseDialog = true },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("지출 용도 입력")
                 }
-            )
+            }
             
             Spacer(modifier = Modifier.weight(1f))
             
@@ -194,17 +173,31 @@ fun FileNameInputScreen(
             BottomButtons(
                 onRetake = onRetake,
                 onConfirm = {
-                    val error = validateFileName(fileName)
-                    if (error != null) {
-                        fileNameError = error
-                    } else {
+                    confirmedFileName?.let { fileName ->
                         onConfirm(fileName)
                     }
                 },
-                isConfirmEnabled = validateFileName(fileName) == null
+                isConfirmEnabled = confirmedFileName != null
             )
             
             Spacer(modifier = Modifier.height(16.dp))
+        }
+        
+        // 지출 용도 입력 다이얼로그
+        if (showExpenseDialog) {
+            ExpenseInputDialog(
+                onDismiss = {
+                    showExpenseDialog = false
+                    // 파일명이 아직 설정되지 않았으면 취소로 처리
+                    if (confirmedFileName == null) {
+                        onCancel()
+                    }
+                },
+                onConfirm = { fileName ->
+                    confirmedFileName = fileName
+                    showExpenseDialog = false
+                }
+            )
         }
     }
 }
@@ -224,7 +217,7 @@ private fun TopBar(
     ) {
         // 타이틀
         Text(
-            text = "파일명 입력",
+            text = "이미지 확인",
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
@@ -287,70 +280,54 @@ private fun ImagePreviewCard(
 }
 
 /**
- * 파일명 입력 필드 Composable
+ * 파일명 표시 영역 Composable
  */
 @Composable
-private fun FileNameInputField(
+private fun FileNameDisplay(
     fileName: String,
-    onFileNameChange: (String) -> Unit,
-    error: String?,
-    focusRequester: FocusRequester,
-    onDone: () -> Unit,
+    onEditClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth()
-    ) {
-        // 레이블
-        Text(
-            text = "저장할 파일명",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 8.dp)
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
         )
-        
-        // 입력 필드
-        OutlinedTextField(
-            value = fileName,
-            onValueChange = onFileNameChange,
+    ) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .focusRequester(focusRequester),
-            placeholder = {
-                Text("파일명을 입력하세요")
-            },
-            suffix = {
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
-                    text = ".jpg",
+                    text = "파일명",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            },
-            isError = error != null,
-            supportingText = if (error != null) {
-                {
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            } else {
-                {
-                    Text(
-                        text = "파일은 Google Drive에 업로드됩니다",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.None,
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = { onDone() }
-            ),
-            shape = RoundedCornerShape(12.dp)
-        )
+                
+                Text(
+                    text = fileName,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            
+            // 수정 버튼
+            OutlinedButton(
+                onClick = onEditClick,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("수정")
+            }
+        }
     }
 }
 
@@ -387,7 +364,7 @@ private fun BottomButtons(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "확인",
+                text = "저장하기",
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold
                 )
@@ -414,19 +391,6 @@ private fun BottomButtons(
             )
         }
     }
-}
-
-/**
- * 기본 파일명 생성 함수
- * 
- * 현재 날짜와 시간을 기반으로 기본 파일명을 생성합니다.
- * 형식: BILZ_yyyyMMdd_HHmmss
- * 
- * @return 생성된 기본 파일명
- */
-private fun generateDefaultFileName(): String {
-    val dateFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
-    return "BILZ_${dateFormat.format(Date())}"
 }
 
 /**
