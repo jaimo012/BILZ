@@ -362,7 +362,14 @@ fun BilzApp() {
                     // 출력 이미지 품질 (JPEG 압축률)
                     outputCompressQuality = 90,
                     // 출력 이미지 형식
-                    outputCompressFormat = android.graphics.Bitmap.CompressFormat.JPEG
+                    outputCompressFormat = android.graphics.Bitmap.CompressFormat.JPEG,
+                    // 툴바 스타일 - 더 눈에 띄게 설정
+                    toolbarColor = android.graphics.Color.parseColor("#00BCD4"),
+                    toolbarTitleColor = android.graphics.Color.WHITE,
+                    toolbarBackButtonColor = android.graphics.Color.WHITE,
+                    activityBackgroundColor = android.graphics.Color.parseColor("#121212"),
+                    // 저장 버튼을 텍스트로 표시 (더 눈에 띄게)
+                    cropMenuCropButtonTitle = "저장"
                 )
             )
             

@@ -3,18 +3,23 @@ package com.bilz.app.ui.screens
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import android.view.MotionEvent
 import android.view.ViewGroup
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.core.content.FileProvider
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +28,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,11 +56,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview as ComposePreview
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.delay
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.bilz.app.ui.theme.BILZTheme
@@ -109,6 +119,13 @@ fun CameraScreen(
             .build()
     }
     
+    // Camera 인스턴스 (자동 초점 제어용)
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    
+    // 초점 인디케이터 상태
+    var focusPoint by remember { mutableStateOf<Pair<Float, Float>?>(null) }
+    var showFocusIndicator by remember { mutableStateOf(false) }
+    
     // PreviewView 인스턴스
     val previewView = remember {
         PreviewView(context).apply {
@@ -141,13 +158,28 @@ fun CameraScreen(
             .build()
         
         try {
-            // 카메라 바인딩
-            cameraProvider.bindToLifecycle(
+            // 카메라 바인딩 및 Camera 객체 저장
+            camera = cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
                 preview,
                 imageCapture
             )
+            
+            // 연속 자동 초점 (Continuous Auto Focus) 시작
+            camera?.cameraControl?.let { cameraControl ->
+                val factory = SurfaceOrientedMeteringPointFactory(
+                    previewView.width.toFloat(),
+                    previewView.height.toFloat()
+                )
+                // 화면 중앙에 초점을 맞추도록 설정
+                val centerPoint = factory.createPoint(0.5f, 0.5f)
+                val action = FocusMeteringAction.Builder(centerPoint)
+                    .build()
+                cameraControl.startFocusAndMetering(action)
+            }
+            
+            Log.d("CameraScreen", "카메라 바인딩 성공, 자동 초점 시작")
         } catch (e: Exception) {
             Log.e("CameraScreen", "카메라 바인딩 실패", e)
             onError(e)
@@ -175,10 +207,43 @@ fun CameraScreen(
     // UI 구성
     // ============================================================
     
+    // 초점 인디케이터 자동 숨김
+    LaunchedEffect(showFocusIndicator) {
+        if (showFocusIndicator) {
+            delay(1000) // 1초 후 숨김
+            showFocusIndicator = false
+        }
+    }
+    
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
+            // 터치로 초점 맞추기
+            .pointerInput(camera) {
+                detectTapGestures { offset ->
+                    camera?.let { cam ->
+                        // 터치 위치 저장 (초점 인디케이터 표시용)
+                        focusPoint = Pair(offset.x, offset.y)
+                        showFocusIndicator = true
+                        
+                        // 터치 위치로 초점 맞추기
+                        val factory = SurfaceOrientedMeteringPointFactory(
+                            size.width.toFloat(),
+                            size.height.toFloat()
+                        )
+                        val point = factory.createPoint(
+                            offset.x / size.width,
+                            offset.y / size.height
+                        )
+                        val action = FocusMeteringAction.Builder(point)
+                            .build()
+                        
+                        cam.cameraControl.startFocusAndMetering(action)
+                        Log.d("CameraScreen", "터치 초점: (${offset.x}, ${offset.y})")
+                    }
+                }
+            }
     ) {
         // 카메라 미리보기
         AndroidView(
@@ -187,6 +252,16 @@ fun CameraScreen(
                 .fillMaxSize()
                 .scale(shutterScale)
         )
+        
+        // 초점 인디케이터 (터치 위치에 표시)
+        focusPoint?.let { (x, y) ->
+            if (showFocusIndicator) {
+                FocusIndicator(
+                    modifier = Modifier
+                        .offset { IntOffset(x.toInt() - 30, y.toInt() - 30) }
+                )
+            }
+        }
         
         // 셔터 효과 (촬영 시 화면 깜빡임)
         if (showShutterEffect) {
@@ -315,6 +390,33 @@ private fun BottomCaptureBar(
             onClick = onCaptureClick
         )
     }
+}
+
+/**
+ * 초점 인디케이터 Composable
+ * 
+ * 터치로 초점을 맞출 때 해당 위치에 표시되는 인디케이터입니다.
+ */
+@Composable
+private fun FocusIndicator(
+    modifier: Modifier = Modifier
+) {
+    val animatedSize by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = tween(durationMillis = 200),
+        label = "focusIndicator"
+    )
+    
+    Box(
+        modifier = modifier
+            .size(60.dp)
+            .scale(animatedSize)
+            .border(
+                width = 2.dp,
+                color = Color(0xFF00BCD4), // 시안 블루
+                shape = RoundedCornerShape(8.dp)
+            )
+    )
 }
 
 /**
