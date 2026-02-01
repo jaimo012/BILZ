@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import android.view.ViewGroup
 import androidx.camera.core.CameraSelector
+import androidx.core.content.FileProvider
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -410,8 +411,13 @@ private suspend fun captureImage(
         executor,
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                // 촬영 성공 - 저장된 파일의 Uri 반환
-                val savedUri = Uri.fromFile(photoFile)
+                // 촬영 성공 - FileProvider를 통해 content:// Uri 생성
+                // Android 7.0+ 에서는 file:// Uri 대신 content:// Uri를 사용해야 함
+                val savedUri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    photoFile
+                )
                 Log.d("CameraScreen", "이미지 저장 성공: $savedUri")
                 continuation.resume(savedUri)
             }
