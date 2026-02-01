@@ -2,16 +2,22 @@
 <!--
     BILZ 앱 테마 설정
     
-    Material3 테마를 기반으로 앱의 전체적인 스타일을 정의합니다.
+    어두운 배경의 깔끔한 스타일을 위한 다크 테마
 -->
 <resources>
     
-    <!-- 기본 앱 테마 (라이트 모드) -->
-    <style name="Theme.BILZ" parent="android:Theme.Material.Light.NoActionBar">
-        <!-- 상태바 색상 -->
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <!-- 네비게이션 바 색상 -->
-        <item name="android:navigationBarColor">@android:color/transparent</item>
+    <!-- 기본 앱 테마 (다크 모드) -->
+    <style name="Theme.BILZ" parent="android:Theme.Material.NoActionBar">
+        <!-- 상태바 색상 - 어두운 배경과 동일 -->
+        <item name="android:statusBarColor">#0D0D0D</item>
+        <!-- 네비게이션 바 색상 - 어두운 배경과 동일 -->
+        <item name="android:navigationBarColor">#0D0D0D</item>
+        <!-- 배경색 -->
+        <item name="android:windowBackground">#0D0D0D</item>
+        <!-- 상태바 아이콘 밝은 색상 -->
+        <item name="android:windowLightStatusBar">false</item>
+        <!-- 네비게이션 바 아이콘 밝은 색상 -->
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
     
 </resources>
