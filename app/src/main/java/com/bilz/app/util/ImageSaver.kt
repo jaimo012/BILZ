@@ -64,7 +64,7 @@ object ImageSaver {
     private const val BILZ_FOLDER_NAME = "BILZ"
     
     /** 이미지 저장 경로 (Pictures/BILZ) */
-    private const val RELATIVE_PATH = "${Environment.DIRECTORY_PICTURES}/$BILZ_FOLDER_NAME"
+    private const val RELATIVE_PATH = "Pictures/$BILZ_FOLDER_NAME"
     
     /** MIME 타입 */
     private const val MIME_TYPE_JPEG = "image/jpeg"
