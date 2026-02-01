@@ -61,6 +61,7 @@
          애플리케이션 설정 (Application Configuration)
          ============================================================ -->
     <application
+        android:name=".BilzApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
