@@ -18,26 +18,57 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.bilz.app.ui.screens.CameraScreen
 import com.bilz.app.ui.screens.FileNameInputScreen
 import com.bilz.app.ui.screens.HomeScreen
 import com.bilz.app.ui.screens.PermissionScreen
 import com.bilz.app.ui.theme.BILZTheme
+import com.bilz.app.util.ImageSaveResult
+import com.bilz.app.util.ImageSaver
 import com.canhub.cropper.CropImageContract
 import com.canhub.cropper.CropImageContractOptions
 import com.canhub.cropper.CropImageOptions
 import com.canhub.cropper.CropImageView
+import kotlinx.coroutines.launch
 
 /**
  * BILZ 앱의 메인 액티비티
@@ -48,7 +79,7 @@ import com.canhub.cropper.CropImageView
  * 3. 권한이 모두 허용되면 홈 화면 표시
  * 4. 시작 버튼 클릭 시 카메라 화면으로 이동
  * 5. 촬영 완료 후 이미지 자르기 화면 표시
- * 6. 자르기 완료 후 파일명 입력 화면으로 이동
+ * 6. 자르기 완료 후 파일명 입력 및 로컬 저장
  */
 class MainActivity : ComponentActivity() {
     
@@ -91,6 +122,25 @@ sealed class AppScreen {
     
     /** 크롭 완료 - 파일명 입력 대기 상태 (크롭된 이미지 Uri 포함) */
     data class CropCompleted(val croppedImageUri: Uri) : AppScreen()
+    
+    /** 저장 중 상태 */
+    data class Saving(
+        val croppedImageUri: Uri,
+        val fileName: String
+    ) : AppScreen()
+    
+    /** 저장 완료 상태 */
+    data class SaveCompleted(
+        val savedUri: Uri,
+        val fileName: String,
+        val relativePath: String
+    ) : AppScreen()
+    
+    /** 저장 실패 상태 */
+    data class SaveFailed(
+        val errorMessage: String,
+        val croppedImageUri: Uri
+    ) : AppScreen()
 }
 
 /**
@@ -102,6 +152,7 @@ sealed class AppScreen {
 fun BilzApp() {
     // 현재 Context 가져오기
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     
     // ============================================================
     // 권한 상태 관리
@@ -231,6 +282,41 @@ fun BilzApp() {
     }
     
     // ============================================================
+    // 저장 상태에서 이미지 저장 실행
+    // ============================================================
+    
+    LaunchedEffect(currentScreen) {
+        val screen = currentScreen
+        if (screen is AppScreen.Saving) {
+            // 이미지 저장 실행
+            val result = ImageSaver.saveImage(
+                context = context,
+                sourceUri = screen.croppedImageUri,
+                fileName = screen.fileName
+            )
+            
+            // 결과에 따라 화면 전환
+            currentScreen = when (result) {
+                is ImageSaveResult.Success -> {
+                    Log.d("MainActivity", "이미지 저장 성공: ${result.savedUri}")
+                    AppScreen.SaveCompleted(
+                        savedUri = result.savedUri,
+                        fileName = result.displayName,
+                        relativePath = result.relativePath
+                    )
+                }
+                is ImageSaveResult.Failure -> {
+                    Log.e("MainActivity", "이미지 저장 실패: ${result.message}")
+                    AppScreen.SaveFailed(
+                        errorMessage = result.message,
+                        croppedImageUri = screen.croppedImageUri
+                    )
+                }
+            }
+        }
+    }
+    
+    // ============================================================
     // 화면 표시 로직 (애니메이션 포함)
     // ============================================================
     
@@ -290,7 +376,6 @@ fun BilzApp() {
                 CameraScreen(
                     onImageCaptured = { uri ->
                         // 촬영 성공: 크롭 대기 상태로 전환
-                        // (LaunchedEffect에서 크롭 화면이 자동 실행됨)
                         Log.d("MainActivity", "이미지 촬영 완료: $uri")
                         currentScreen = AppScreen.WaitingForCrop(uri)
                     },
@@ -312,7 +397,6 @@ fun BilzApp() {
             
             // 크롭 대기 상태 (로딩 화면 표시)
             is AppScreen.WaitingForCrop -> {
-                // 크롭 화면이 열리는 동안 로딩 표시
                 LoadingScreen(message = "이미지 편집 준비 중...")
             }
             
@@ -321,15 +405,12 @@ fun BilzApp() {
                 FileNameInputScreen(
                     croppedImageUri = screen.croppedImageUri,
                     onConfirm = { fileName ->
-                        // 파일명 확정
-                        Log.d("MainActivity", "파일명 확정: $fileName")
-                        Toast.makeText(
-                            context,
-                            "파일명: $fileName 으로 저장 준비 완료",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        // TODO: 5단계에서 Google Drive 업로드 구현
-                        currentScreen = AppScreen.Home
+                        // 파일명 확정 -> 저장 시작
+                        Log.d("MainActivity", "저장 시작: $fileName")
+                        currentScreen = AppScreen.Saving(
+                            croppedImageUri = screen.croppedImageUri,
+                            fileName = fileName
+                        )
                     },
                     onCancel = {
                         // 취소: 홈으로 이동
@@ -341,60 +422,285 @@ fun BilzApp() {
                     }
                 )
             }
+            
+            // 저장 중 화면
+            is AppScreen.Saving -> {
+                LoadingScreen(message = "이미지 저장 중...")
+            }
+            
+            // 저장 완료 화면
+            is AppScreen.SaveCompleted -> {
+                SaveCompletedScreen(
+                    fileName = screen.fileName,
+                    relativePath = screen.relativePath,
+                    onHomeClick = {
+                        currentScreen = AppScreen.Home
+                    },
+                    onTakeAnotherClick = {
+                        currentScreen = AppScreen.Camera
+                    }
+                )
+            }
+            
+            // 저장 실패 화면
+            is AppScreen.SaveFailed -> {
+                SaveFailedScreen(
+                    errorMessage = screen.errorMessage,
+                    onRetryClick = {
+                        // 파일명 입력 화면으로 돌아가기
+                        currentScreen = AppScreen.CropCompleted(screen.croppedImageUri)
+                    },
+                    onHomeClick = {
+                        currentScreen = AppScreen.Home
+                    }
+                )
+            }
         }
     }
 }
 
 /**
  * 로딩 화면 Composable
- * 
- * 작업이 진행 중일 때 표시되는 로딩 화면입니다.
  */
 @Composable
 private fun LoadingScreen(
     message: String,
     modifier: Modifier = Modifier
 ) {
-    androidx.compose.foundation.layout.Box(
+    Box(
         modifier = modifier.fillMaxSize(),
-        contentAlignment = androidx.compose.ui.Alignment.Center
+        contentAlignment = Alignment.Center
     ) {
-        androidx.compose.foundation.layout.Column(
-            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            androidx.compose.material3.CircularProgressIndicator()
+            CircularProgressIndicator()
             
-            androidx.compose.material3.Text(
+            Text(
                 text = message,
-                style = androidx.compose.material3.MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge
             )
         }
     }
 }
 
-// dp 단위를 위한 import
-private val dp = androidx.compose.ui.unit.dp
+/**
+ * 저장 완료 화면 Composable
+ */
+@Composable
+private fun SaveCompletedScreen(
+    fileName: String,
+    relativePath: String,
+    onHomeClick: () -> Unit,
+    onTakeAnotherClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 성공 아이콘
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = "저장 완료",
+                modifier = Modifier.size(80.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            
+            // 성공 메시지
+            Text(
+                text = "저장 완료!",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            // 파일 정보 카드
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // 파일명
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "파일명",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = fileName,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    // 저장 위치
+                    Text(
+                        text = "저장 위치",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = relativePath,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // 버튼들
+            Button(
+                onClick = onTakeAnotherClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "다른 영수증 촬영",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+            
+            OutlinedButton(
+                onClick = onHomeClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "홈으로",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 저장 실패 화면 Composable
+ */
+@Composable
+private fun SaveFailedScreen(
+    errorMessage: String,
+    onRetryClick: () -> Unit,
+    onHomeClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 에러 아이콘
+            Icon(
+                imageVector = Icons.Default.Error,
+                contentDescription = "저장 실패",
+                modifier = Modifier.size(80.dp),
+                tint = MaterialTheme.colorScheme.error
+            )
+            
+            // 실패 메시지
+            Text(
+                text = "저장 실패",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            // 에러 상세
+            Text(
+                text = errorMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // 버튼들
+            Button(
+                onClick = onRetryClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "다시 시도",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+            
+            OutlinedButton(
+                onClick = onHomeClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "홈으로",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+        }
+    }
+}
 
 /**
  * 저장소 권한 확인 함수
- * 
- * Android 버전에 따라 다른 권한을 확인합니다:
- * - Android 13 (API 33) 이상: READ_MEDIA_IMAGES
- * - Android 13 미만: READ_EXTERNAL_STORAGE
- * 
- * @param context 현재 Context
- * @return 저장소 권한 허용 여부
  */
 private fun checkStoragePermission(context: android.content.Context): Boolean {
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        // Android 13 이상: READ_MEDIA_IMAGES 권한 확인
         ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.READ_MEDIA_IMAGES
         ) == PackageManager.PERMISSION_GRANTED
     } else {
-        // Android 13 미만: READ_EXTERNAL_STORAGE 권한 확인
         ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.READ_EXTERNAL_STORAGE
@@ -404,12 +710,6 @@ private fun checkStoragePermission(context: android.content.Context): Boolean {
 
 /**
  * 필요한 권한 목록을 생성하는 함수
- * 
- * 아직 허용되지 않은 권한만 목록에 포함합니다.
- * 
- * @param hasCameraPermission 카메라 권한 보유 여부
- * @param hasStoragePermission 저장소 권한 보유 여부
- * @return 요청해야 할 권한 목록
  */
 private fun buildRequiredPermissionsList(
     hasCameraPermission: Boolean,
@@ -417,12 +717,10 @@ private fun buildRequiredPermissionsList(
 ): List<String> {
     val permissions = mutableListOf<String>()
     
-    // 카메라 권한이 없으면 추가
     if (!hasCameraPermission) {
         permissions.add(Manifest.permission.CAMERA)
     }
     
-    // 저장소 권한이 없으면 추가 (Android 버전에 따라 다른 권한)
     if (!hasStoragePermission) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
