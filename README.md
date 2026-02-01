@@ -77,7 +77,8 @@ BILZ/
 │   │       │   │       └── Type.kt
 │   │       │   └── util/
 │   │       │       ├── ImageSaver.kt          # MediaStore 이미지 저장 유틸리티
-│   │       │       └── GoogleAuthManager.kt   # Google 로그인 관리 클래스
+│   │       │       ├── GoogleAuthManager.kt   # Google 로그인 관리 클래스
+│   │       │       └── DriveServiceHelper.kt  # Google Drive 업로드 헬퍼
 │   │       ├── res/
 │   │       │   ├── values/
 │   │       │   │   ├── strings.xml
@@ -160,6 +161,11 @@ dependencies {
   - DriveScopes.DRIVE_FILE 스코프 요청
   - 저장 완료 화면에 Google Drive 업로드 버튼 추가
   - 로그인 상태에 따른 자동 로그인/로그인 화면 표시
+- ☁️ Google Drive 업로드 기능 구현
+  - DriveServiceHelper 클래스로 Drive API 연동
+  - 지정된 폴더(BILZ_FOLDER_ID)에 이미지 업로드
+  - Content Uri에서 직접 업로드 지원
+  - 업로드 완료/실패 화면 UI 구현
 
 ## 🤝 기여하기
 

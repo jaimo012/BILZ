@@ -64,6 +64,8 @@ import com.bilz.app.ui.screens.FileNameInputScreen
 import com.bilz.app.ui.screens.HomeScreen
 import com.bilz.app.ui.screens.PermissionScreen
 import com.bilz.app.ui.theme.BILZTheme
+import com.bilz.app.util.DriveServiceHelper
+import com.bilz.app.util.DriveUploadResult
 import com.bilz.app.util.GoogleAuthManager
 import com.bilz.app.util.GoogleSignInResult
 import com.bilz.app.util.ImageSaveResult
@@ -160,6 +162,28 @@ sealed class AppScreen {
         val savedUri: Uri,
         val fileName: String,
         val relativePath: String,
+        val account: GoogleSignInAccount
+    ) : AppScreen()
+    
+    /** Google Drive 업로드 중 상태 */
+    data class Uploading(
+        val savedUri: Uri,
+        val fileName: String,
+        val account: GoogleSignInAccount
+    ) : AppScreen()
+    
+    /** Google Drive 업로드 완료 상태 */
+    data class UploadCompleted(
+        val fileName: String,
+        val driveFileId: String,
+        val webViewLink: String?
+    ) : AppScreen()
+    
+    /** Google Drive 업로드 실패 상태 */
+    data class UploadFailed(
+        val errorMessage: String,
+        val savedUri: Uri,
+        val fileName: String,
         val account: GoogleSignInAccount
     ) : AppScreen()
 }
@@ -423,6 +447,59 @@ fun BilzApp() {
     }
     
     // ============================================================
+    // 업로드 상태에서 Google Drive 업로드 실행
+    // ============================================================
+    
+    LaunchedEffect(currentScreen) {
+        val screen = currentScreen
+        if (screen is AppScreen.Uploading) {
+            Log.d("MainActivity", "Google Drive 업로드 시작: ${screen.fileName}")
+            
+            try {
+                // DriveServiceHelper 생성
+                val driveHelper = DriveServiceHelper(context, screen.account)
+                
+                // Content Uri에서 직접 업로드
+                val result = driveHelper.uploadFromContentUri(
+                    contentUri = screen.savedUri,
+                    fileName = screen.fileName,
+                    mimeType = DriveServiceHelper.MIME_TYPE_JPEG,
+                    folderId = DriveServiceHelper.BILZ_FOLDER_ID
+                )
+                
+                // 결과에 따라 화면 전환
+                currentScreen = when (result) {
+                    is DriveUploadResult.Success -> {
+                        Log.d("MainActivity", "업로드 성공: ${result.fileId}")
+                        AppScreen.UploadCompleted(
+                            fileName = result.fileName,
+                            driveFileId = result.fileId,
+                            webViewLink = result.webViewLink
+                        )
+                    }
+                    is DriveUploadResult.Failure -> {
+                        Log.e("MainActivity", "업로드 실패: ${result.message}")
+                        AppScreen.UploadFailed(
+                            errorMessage = result.message,
+                            savedUri = screen.savedUri,
+                            fileName = screen.fileName,
+                            account = screen.account
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "업로드 중 예외 발생", e)
+                currentScreen = AppScreen.UploadFailed(
+                    errorMessage = "업로드 중 오류 발생: ${e.message}",
+                    savedUri = screen.savedUri,
+                    fileName = screen.fileName,
+                    account = screen.account
+                )
+            }
+        }
+    }
+    
+    // ============================================================
     // 화면 표시 로직 (애니메이션 포함)
     // ============================================================
     
@@ -584,19 +661,56 @@ fun BilzApp() {
                     relativePath = screen.relativePath,
                     accountEmail = screen.account.email ?: "알 수 없음",
                     onUploadClick = {
-                        // TODO: 8단계에서 실제 업로드 구현
-                        Toast.makeText(
-                            context,
-                            "Google Drive 업로드 기능은 다음 단계에서 구현됩니다",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        currentScreen = AppScreen.Home
+                        // 업로드 시작
+                        currentScreen = AppScreen.Uploading(
+                            savedUri = screen.savedUri,
+                            fileName = screen.fileName,
+                            account = screen.account
+                        )
                     },
                     onCancelClick = {
                         currentScreen = AppScreen.SaveCompleted(
                             savedUri = screen.savedUri,
                             fileName = screen.fileName,
                             relativePath = screen.relativePath
+                        )
+                    },
+                    onHomeClick = {
+                        currentScreen = AppScreen.Home
+                    }
+                )
+            }
+            
+            // 업로드 중 화면
+            is AppScreen.Uploading -> {
+                LoadingScreen(message = "Google Drive에 업로드 중...")
+            }
+            
+            // 업로드 완료 화면
+            is AppScreen.UploadCompleted -> {
+                UploadCompletedScreen(
+                    fileName = screen.fileName,
+                    driveFileId = screen.driveFileId,
+                    webViewLink = screen.webViewLink,
+                    onTakeAnotherClick = {
+                        currentScreen = AppScreen.Camera
+                    },
+                    onHomeClick = {
+                        currentScreen = AppScreen.Home
+                    }
+                )
+            }
+            
+            // 업로드 실패 화면
+            is AppScreen.UploadFailed -> {
+                UploadFailedScreen(
+                    errorMessage = screen.errorMessage,
+                    onRetryClick = {
+                        // 재시도: 업로드 다시 시작
+                        currentScreen = AppScreen.Uploading(
+                            savedUri = screen.savedUri,
+                            fileName = screen.fileName,
+                            account = screen.account
                         )
                     },
                     onHomeClick = {
@@ -970,6 +1084,224 @@ private fun SaveFailedScreen(
             // 실패 메시지
             Text(
                 text = "저장 실패",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            // 에러 상세
+            Text(
+                text = errorMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // 버튼들
+            Button(
+                onClick = onRetryClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "다시 시도",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+            
+            OutlinedButton(
+                onClick = onHomeClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "홈으로",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Google Drive 업로드 완료 화면 Composable
+ */
+@Composable
+private fun UploadCompletedScreen(
+    fileName: String,
+    driveFileId: String,
+    webViewLink: String?,
+    onTakeAnotherClick: () -> Unit,
+    onHomeClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 성공 아이콘
+            Icon(
+                imageVector = Icons.Default.CloudUpload,
+                contentDescription = "업로드 완료",
+                modifier = Modifier.size(80.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            
+            // 성공 메시지
+            Text(
+                text = "업로드 완료!",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            // 파일 정보 카드
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // 파일명
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudUpload,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "업로드된 파일",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = fileName,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    // Drive 파일 ID
+                    Text(
+                        text = "Drive 파일 ID",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = driveFileId,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    // 웹 링크 (있는 경우)
+                    if (webViewLink != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Google Drive에서 확인 가능",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // 버튼들
+            Button(
+                onClick = onTakeAnotherClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "다른 영수증 촬영",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+            
+            OutlinedButton(
+                onClick = onHomeClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "홈으로",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Google Drive 업로드 실패 화면 Composable
+ */
+@Composable
+private fun UploadFailedScreen(
+    errorMessage: String,
+    onRetryClick: () -> Unit,
+    onHomeClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 에러 아이콘
+            Icon(
+                imageVector = Icons.Default.Error,
+                contentDescription = "업로드 실패",
+                modifier = Modifier.size(80.dp),
+                tint = MaterialTheme.colorScheme.error
+            )
+            
+            // 실패 메시지
+            Text(
+                text = "업로드 실패",
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold
                 ),
