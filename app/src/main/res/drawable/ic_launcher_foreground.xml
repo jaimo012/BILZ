@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    BILZ 앱 아이콘 포그라운드
+    시안 블루 색상의 카메라/영수증 아이콘
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- 배경 원 -->
+    <path
+        android:fillColor="#00BCD4"
+        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0" />
+    
+    <!-- 카메라 본체 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,42h36c2.2,0 4,1.8 4,4v20c0,2.2 -1.8,4 -4,4H36c-2.2,0 -4,-1.8 -4,-4V46c0,-2.2 1.8,-4 4,-4z" />
+    
+    <!-- 카메라 렌즈 (원) -->
+    <path
+        android:fillColor="#00BCD4"
+        android:pathData="M54,56m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0" />
+    
+    <!-- 카메라 렌즈 내부 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,56m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
+    
+    <!-- 카메라 플래시 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,38h8l-2,4h-4z" />
+    
+</vector>
