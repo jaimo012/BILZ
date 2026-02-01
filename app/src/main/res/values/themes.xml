@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    BILZ 앱 테마 설정
+    
+    Material3 테마를 기반으로 앱의 전체적인 스타일을 정의합니다.
+-->
+<resources>
+    
+    <!-- 기본 앱 테마 (라이트 모드) -->
+    <style name="Theme.BILZ" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- 상태바 색상 -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- 네비게이션 바 색상 -->
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+    
+</resources>

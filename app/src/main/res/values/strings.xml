@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    BILZ 앱 문자열 리소스
+    
+    앱에서 사용하는 모든 텍스트를 이 파일에서 관리합니다.
+    다국어 지원을 위해 문자열을 하드코딩하지 않고 리소스로 관리하는 것이 좋습니다.
+-->
+<resources>
+    <!-- 앱 이름 -->
+    <string name="app_name">BILZ</string>
+    
+    <!-- 권한 관련 메시지 -->
+    <string name="camera_permission_required">카메라 기능을 사용하려면 카메라 권한이 필요합니다.</string>
+    <string name="storage_permission_required">이미지를 저장하려면 저장소 권한이 필요합니다.</string>
+    
+    <!-- 버튼 텍스트 -->
+    <string name="btn_take_photo">사진 촬영</string>
+    <string name="btn_select_image">갤러리에서 선택</string>
+    <string name="btn_crop_image">이미지 자르기</string>
+    <string name="btn_upload_drive">드라이브에 업로드</string>
+    <string name="btn_google_login">Google 로그인</string>
+    
+    <!-- 상태 메시지 -->
+    <string name="loading">로딩 중...</string>
+    <string name="upload_success">업로드 완료!</string>
+    <string name="upload_failed">업로드 실패</string>
+</resources>

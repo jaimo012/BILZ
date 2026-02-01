@@ -1,0 +1,144 @@
+# BILZ 프로젝트 버전 카탈로그
+# 모든 의존성의 버전을 중앙에서 관리합니다.
+
+[versions]
+# ============================================================
+# SDK 버전
+# ============================================================
+compileSdk = "34"
+minSdk = "26"
+targetSdk = "34"
+
+# ============================================================
+# 플러그인 버전
+# ============================================================
+agp = "8.7.2"
+kotlin = "2.0.21"
+
+# ============================================================
+# AndroidX 라이브러리 버전
+# ============================================================
+coreKtx = "1.15.0"
+lifecycleRuntimeKtx = "2.8.7"
+activityCompose = "1.9.3"
+composeBom = "2024.12.01"
+
+# ============================================================
+# CameraX 버전 (카메라 기능)
+# ============================================================
+cameraX = "1.4.1"
+
+# ============================================================
+# Coil 버전 (이미지 로딩)
+# ============================================================
+coil = "2.7.0"
+
+# ============================================================
+# Google 서비스 버전
+# ============================================================
+# Google Play Services Auth (구글 로그인)
+playServicesAuth = "21.3.0"
+
+# Google API Client (구글 드라이브 업로드)
+googleApiClient = "2.7.0"
+googleApiServicesDrive = "v3-rev20241206-2.0.0"
+googleHttpClientGson = "1.45.1"
+
+# ============================================================
+# Image Cropper 버전 (이미지 자르기)
+# ============================================================
+imageCropper = "4.6.0"
+
+# ============================================================
+# Coroutines 버전 (비동기 처리)
+# ============================================================
+coroutines = "1.9.0"
+
+# ============================================================
+# 테스트 라이브러리 버전
+# ============================================================
+junit = "4.13.2"
+junitVersion = "1.2.1"
+espressoCore = "3.6.1"
+
+[libraries]
+# ============================================================
+# AndroidX Core 라이브러리
+# ============================================================
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+
+# ============================================================
+# Jetpack Compose 라이브러리 (BOM으로 버전 관리)
+# ============================================================
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+
+# ============================================================
+# CameraX 라이브러리 (카메라 기능)
+# ============================================================
+# camera-core: CameraX의 핵심 기능 (카메라 설정, 미리보기 등)
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "cameraX" }
+# camera-camera2: Camera2 API를 기반으로 한 CameraX 구현체
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "cameraX" }
+# camera-lifecycle: 생명주기에 맞춘 카메라 관리
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraX" }
+# camera-view: 카메라 미리보기 뷰 컴포넌트
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraX" }
+
+# ============================================================
+# Coil 라이브러리 (이미지 로딩)
+# ============================================================
+# coil-compose: Jetpack Compose에서 이미지를 쉽게 로드하고 표시
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+
+# ============================================================
+# Google Play Services Auth (구글 로그인)
+# ============================================================
+play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
+
+# ============================================================
+# Google API Client (구글 드라이브 업로드)
+# ============================================================
+# google-api-client-android: Android용 Google API 클라이언트
+google-api-client-android = { group = "com.google.api-client", name = "google-api-client-android", version.ref = "googleApiClient" }
+# google-api-services-drive: Google Drive API 서비스
+google-api-services-drive = { group = "com.google.apis", name = "google-api-services-drive", version.ref = "googleApiServicesDrive" }
+# google-http-client-gson: JSON 파싱을 위한 HTTP 클라이언트
+google-http-client-gson = { group = "com.google.http-client", name = "google-http-client-gson", version.ref = "googleHttpClientGson" }
+
+# ============================================================
+# CanHub Image Cropper (이미지 자르기)
+# ============================================================
+# android-image-cropper: 이미지 자르기/크롭 기능 제공
+android-image-cropper = { group = "com.github.CanHub", name = "Android-Image-Cropper", version.ref = "imageCropper" }
+
+# ============================================================
+# Kotlin Coroutines (비동기 처리)
+# ============================================================
+# kotlinx-coroutines-core: 코루틴 핵심 기능
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+# kotlinx-coroutines-android: Android 메인 스레드 디스패처
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
+# ============================================================
+# 테스트 라이브러리
+# ============================================================
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+
+[plugins]
+# Android Application 플러그인
+android-application = { id = "com.android.application", version.ref = "agp" }
+# Kotlin Android 플러그인
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+# Kotlin Compose Compiler 플러그인
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

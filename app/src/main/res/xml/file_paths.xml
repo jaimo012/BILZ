@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider 경로 설정
+    
+    FileProvider가 접근할 수 있는 디렉토리를 정의합니다.
+    카메라로 촬영한 이미지나 크롭한 이미지를 저장할 때 사용됩니다.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    
+    <!-- 외부 파일 디렉토리: Context.getExternalFilesDir() -->
+    <external-files-path
+        name="external_files"
+        path="." />
+    
+    <!-- 캐시 디렉토리: Context.getCacheDir() -->
+    <cache-path
+        name="cache"
+        path="." />
+    
+    <!-- 외부 캐시 디렉토리: Context.getExternalCacheDir() -->
+    <external-cache-path
+        name="external_cache"
+        path="." />
+    
+    <!-- 내부 파일 디렉토리: Context.getFilesDir() -->
+    <files-path
+        name="files"
+        path="." />
+        
+</paths>

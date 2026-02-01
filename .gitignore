@@ -1,0 +1,101 @@
+# BILZ Android 프로젝트 .gitignore
+
+# ============================================================
+# Gradle 관련
+# ============================================================
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# ============================================================
+# Android Studio / IntelliJ IDEA
+# ============================================================
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/assetWizardSettings.xml
+.idea/dictionaries
+.idea/libraries
+.idea/caches
+.idea/modules.xml
+.idea/misc.xml
+.idea/vcs.xml
+.idea/runConfigurations.xml
+.idea/jarRepositories.xml
+.idea/deploymentTargetDropDown.xml
+.idea/navEditor.xml
+
+# ============================================================
+# 로컬 설정 파일 (민감한 정보 포함 가능)
+# ============================================================
+local.properties
+keystore.properties
+*.keystore
+*.jks
+signing.properties
+
+# ============================================================
+# 빌드 출력물
+# ============================================================
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# ============================================================
+# 로그 파일
+# ============================================================
+*.log
+
+# ============================================================
+# OS 생성 파일
+# ============================================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# ============================================================
+# 테스트 관련
+# ============================================================
+.test/
+coverage/
+test-results/
+
+# ============================================================
+# 기타
+# ============================================================
+*.swp
+*.swo
+*.bak
+*.tmp
+*.temp
+captures/
+.externalNativeBuild/
+.cxx/
+google-services.json
+
+# ============================================================
+# Kotlin 관련
+# ============================================================
+*.kotlin_module

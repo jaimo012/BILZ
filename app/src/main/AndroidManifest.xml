@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    BILZ 앱 AndroidManifest.xml
+    
+    이 파일은 Android 시스템에 앱의 필수 정보를 제공합니다:
+    - 앱이 필요로 하는 권한
+    - 앱의 컴포넌트 (Activity, Service 등)
+    - 앱이 요구하는 하드웨어/소프트웨어 기능
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ============================================================
+         권한 선언 (Permissions)
+         
+         앱이 특정 기능을 사용하기 위해 필요한 권한들입니다.
+         Android 6.0(API 23) 이상에서는 위험 권한의 경우
+         런타임에서도 사용자에게 권한을 요청해야 합니다.
+         ============================================================ -->
+    
+    <!-- 카메라 권한: 기기의 카메라를 사용하기 위해 필요 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    
+    <!-- 인터넷 권한: 네트워크 통신(Google Drive 업로드 등)을 위해 필요 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    
+    <!-- 네트워크 상태 확인 권한: 네트워크 연결 상태를 확인하기 위해 필요 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
+    <!-- 외부 저장소 읽기 권한: 갤러리에서 이미지를 선택하기 위해 필요 (Android 12 이하) -->
+    <uses-permission 
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    
+    <!-- 외부 저장소 쓰기 권한: 이미지를 저장하기 위해 필요 (Android 9 이하) -->
+    <uses-permission 
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    
+    <!-- 미디어 이미지 읽기 권한: Android 13+ 에서 이미지 접근을 위해 필요 -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
+    <!-- ============================================================
+         하드웨어 기능 선언 (Hardware Features)
+         
+         앱이 요구하는 하드웨어 기능을 선언합니다.
+         required="false"로 설정하면 해당 기능이 없는 기기에서도
+         앱을 설치할 수 있습니다 (기능은 사용 불가).
+         ============================================================ -->
+    
+    <!-- 카메라 기능: 카메라가 없는 기기에서도 앱 설치는 가능하도록 required="false" -->
+    <uses-feature 
+        android:name="android.hardware.camera"
+        android:required="false" />
+    
+    <!-- 자동 초점 기능: 자동 초점이 없는 기기에서도 앱 설치 가능 -->
+    <uses-feature 
+        android:name="android.hardware.camera.autofocus"
+        android:required="false" />
+
+    <!-- ============================================================
+         애플리케이션 설정 (Application Configuration)
+         ============================================================ -->
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BILZ">
+        
+        <!-- ========================================================
+             메인 액티비티
+             
+             앱의 진입점(Entry Point)입니다.
+             MAIN action과 LAUNCHER category를 가진 intent-filter가
+             이 액티비티를 앱의 시작점으로 지정합니다.
+             ======================================================== -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.BILZ">
+            
+            <!-- 이 액티비티가 앱의 진입점임을 선언 -->
+            <intent-filter>
+                <!-- MAIN: 이 액티비티가 앱의 메인 진입점 -->
+                <action android:name="android.intent.action.MAIN" />
+                <!-- LAUNCHER: 홈 화면의 앱 런처에 아이콘 표시 -->
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        
+        <!-- ========================================================
+             Image Cropper Activity
+             
+             CanHub Android Image Cropper 라이브러리에서 제공하는
+             이미지 자르기 화면입니다.
+             ======================================================== -->
+        <activity
+            android:name="com.canhub.cropper.CropImageActivity"
+            android:theme="@style/Theme.BILZ" />
+            
+        <!-- ========================================================
+             FileProvider 설정
+             
+             Android 7.0(API 24) 이상에서 파일 URI를 다른 앱과 
+             공유하기 위해 필요한 설정입니다.
+             카메라로 촬영한 이미지를 저장할 때 사용됩니다.
+             ======================================================== -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+        
+    </application>
+
+</manifest>
