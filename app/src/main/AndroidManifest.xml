@@ -99,7 +99,7 @@
              ======================================================== -->
         <activity
             android:name="com.canhub.cropper.CropImageActivity"
-            android:theme="@style/Theme.BILZ" />
+            android:theme="@style/Theme.BILZ.Crop" />
             
         <!-- ========================================================
              FileProvider 설정
