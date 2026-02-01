@@ -18,37 +18,26 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.bilz.app.ui.screens.CameraScreen
+import com.bilz.app.ui.screens.FileNameInputScreen
 import com.bilz.app.ui.screens.HomeScreen
 import com.bilz.app.ui.screens.PermissionScreen
 import com.bilz.app.ui.theme.BILZTheme
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import com.canhub.cropper.CropImageView
 
 /**
  * BILZ 앱의 메인 액티비티
@@ -58,6 +47,8 @@ import com.bilz.app.ui.theme.BILZTheme
  * 2. 권한이 없으면 권한 요청 화면 표시
  * 3. 권한이 모두 허용되면 홈 화면 표시
  * 4. 시작 버튼 클릭 시 카메라 화면으로 이동
+ * 5. 촬영 완료 후 이미지 자르기 화면 표시
+ * 6. 자르기 완료 후 파일명 입력 화면으로 이동
  */
 class MainActivity : ComponentActivity() {
     
@@ -95,8 +86,11 @@ sealed class AppScreen {
     /** 카메라 촬영 화면 */
     data object Camera : AppScreen()
     
-    /** 촬영 완료 화면 (촬영된 이미지 Uri 포함) */
-    data class PhotoCaptured(val imageUri: Uri) : AppScreen()
+    /** 촬영 완료 - 크롭 대기 상태 (원본 이미지 Uri 포함) */
+    data class WaitingForCrop(val originalImageUri: Uri) : AppScreen()
+    
+    /** 크롭 완료 - 파일명 입력 대기 상태 (크롭된 이미지 Uri 포함) */
+    data class CropCompleted(val croppedImageUri: Uri) : AppScreen()
 }
 
 /**
@@ -145,9 +139,6 @@ fun BilzApp() {
         )
     }
     
-    // 촬영된 이미지 Uri (임시 저장)
-    var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
-    
     // ============================================================
     // 권한 요청 런처 설정
     // ============================================================
@@ -169,6 +160,73 @@ fun BilzApp() {
         // 모든 권한이 허용되면 홈 화면으로 이동
         if (hasCameraPermission && hasStoragePermission) {
             currentScreen = AppScreen.Home
+        }
+    }
+    
+    // ============================================================
+    // 이미지 크롭 런처 설정 (CanHub Image Cropper)
+    // ============================================================
+    
+    val cropImageLauncher = rememberLauncherForActivityResult(
+        contract = CropImageContract()
+    ) { result ->
+        if (result.isSuccessful) {
+            // 크롭 성공: 크롭된 이미지 Uri로 화면 전환
+            result.uriContent?.let { croppedUri ->
+                Log.d("MainActivity", "크롭 완료: $croppedUri")
+                currentScreen = AppScreen.CropCompleted(croppedUri)
+            } ?: run {
+                // Uri가 null인 경우 (예외 상황)
+                Log.e("MainActivity", "크롭 결과 Uri가 null입니다")
+                Toast.makeText(context, "이미지 자르기 실패", Toast.LENGTH_SHORT).show()
+                currentScreen = AppScreen.Home
+            }
+        } else {
+            // 크롭 취소 또는 실패
+            val error = result.error
+            if (error != null) {
+                Log.e("MainActivity", "크롭 실패", error)
+                Toast.makeText(context, "이미지 자르기 실패: ${error.message}", Toast.LENGTH_SHORT).show()
+            } else {
+                Log.d("MainActivity", "크롭 취소됨")
+                Toast.makeText(context, "이미지 자르기가 취소되었습니다", Toast.LENGTH_SHORT).show()
+            }
+            // 홈 화면으로 이동
+            currentScreen = AppScreen.Home
+        }
+    }
+    
+    // ============================================================
+    // 크롭 대기 상태에서 크롭 화면 자동 실행
+    // ============================================================
+    
+    // WaitingForCrop 상태가 되면 크롭 화면을 자동으로 실행
+    LaunchedEffect(currentScreen) {
+        val screen = currentScreen
+        if (screen is AppScreen.WaitingForCrop) {
+            // 크롭 옵션 설정
+            val cropOptions = CropImageContractOptions(
+                uri = screen.originalImageUri,
+                cropImageOptions = CropImageOptions(
+                    // 크롭 가이드라인 표시
+                    guidelines = CropImageView.Guidelines.ON,
+                    // 자유 비율 (사용자가 원하는 대로 자르기)
+                    fixAspectRatio = false,
+                    // 크롭 영역 최소 크기
+                    minCropWindowWidth = 100,
+                    minCropWindowHeight = 100,
+                    // 크롭 영역 이동 가능
+                    allowFlipping = true,
+                    allowRotation = true,
+                    // 출력 이미지 품질 (JPEG 압축률)
+                    outputCompressQuality = 90,
+                    // 출력 이미지 형식
+                    outputCompressFormat = android.graphics.Bitmap.CompressFormat.JPEG
+                )
+            )
+            
+            // 크롭 화면 실행
+            cropImageLauncher.launch(cropOptions)
         }
     }
     
@@ -231,19 +289,10 @@ fun BilzApp() {
             is AppScreen.Camera -> {
                 CameraScreen(
                     onImageCaptured = { uri ->
-                        // 촬영 성공: Uri 저장 및 화면 전환
-                        capturedImageUri = uri
+                        // 촬영 성공: 크롭 대기 상태로 전환
+                        // (LaunchedEffect에서 크롭 화면이 자동 실행됨)
                         Log.d("MainActivity", "이미지 촬영 완료: $uri")
-                        
-                        // TODO: 4단계에서 크롭 화면으로 이동
-                        // 현재는 토스트 메시지 표시 후 촬영 완료 화면으로 이동
-                        Toast.makeText(
-                            context,
-                            "촬영 완료!",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        
-                        currentScreen = AppScreen.PhotoCaptured(uri)
+                        currentScreen = AppScreen.WaitingForCrop(uri)
                     },
                     onError = { exception ->
                         // 촬영 실패: 에러 메시지 표시
@@ -261,19 +310,34 @@ fun BilzApp() {
                 )
             }
             
-            // 촬영 완료 화면 (임시)
-            is AppScreen.PhotoCaptured -> {
-                // TODO: 4단계에서 크롭 화면으로 교체
-                // 현재는 촬영된 이미지 정보를 표시하는 임시 화면
-                PhotoCapturedScreen(
-                    imageUri = screen.imageUri,
-                    onRetakeClick = {
-                        // 다시 촬영
-                        currentScreen = AppScreen.Camera
-                    },
-                    onHomeClick = {
-                        // 홈으로 이동
+            // 크롭 대기 상태 (로딩 화면 표시)
+            is AppScreen.WaitingForCrop -> {
+                // 크롭 화면이 열리는 동안 로딩 표시
+                LoadingScreen(message = "이미지 편집 준비 중...")
+            }
+            
+            // 크롭 완료 - 파일명 입력 화면
+            is AppScreen.CropCompleted -> {
+                FileNameInputScreen(
+                    croppedImageUri = screen.croppedImageUri,
+                    onConfirm = { fileName ->
+                        // 파일명 확정
+                        Log.d("MainActivity", "파일명 확정: $fileName")
+                        Toast.makeText(
+                            context,
+                            "파일명: $fileName 으로 저장 준비 완료",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        // TODO: 5단계에서 Google Drive 업로드 구현
                         currentScreen = AppScreen.Home
+                    },
+                    onCancel = {
+                        // 취소: 홈으로 이동
+                        currentScreen = AppScreen.Home
+                    },
+                    onRetake = {
+                        // 다시 촬영: 카메라 화면으로 이동
+                        currentScreen = AppScreen.Camera
                     }
                 )
             }
@@ -282,70 +346,35 @@ fun BilzApp() {
 }
 
 /**
- * 촬영 완료 임시 화면 Composable
+ * 로딩 화면 Composable
  * 
- * 촬영된 이미지 정보를 표시하고, 다시 촬영 또는 홈으로 이동할 수 있습니다.
- * TODO: 4단계에서 크롭 화면으로 교체 예정
+ * 작업이 진행 중일 때 표시되는 로딩 화면입니다.
  */
 @Composable
-private fun PhotoCapturedScreen(
-    imageUri: Uri,
-    onRetakeClick: () -> Unit,
-    onHomeClick: () -> Unit
+private fun LoadingScreen(
+    message: String,
+    modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = androidx.compose.ui.Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        androidx.compose.foundation.layout.Column(
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
         ) {
-            // 촬영 완료 아이콘
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = "촬영 완료",
-                modifier = Modifier.size(80.dp),
-                tint = MaterialTheme.colorScheme.primary
+            androidx.compose.material3.CircularProgressIndicator()
+            
+            androidx.compose.material3.Text(
+                text = message,
+                style = androidx.compose.material3.MaterialTheme.typography.bodyLarge
             )
-            
-            // 완료 메시지
-            Text(
-                text = "촬영이 완료되었습니다!",
-                style = MaterialTheme.typography.headlineSmall
-            )
-            
-            // 파일 경로
-            Text(
-                text = "저장 경로: ${imageUri.lastPathSegment}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 32.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // 버튼들
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // 다시 촬영 버튼
-                OutlinedButton(
-                    onClick = onRetakeClick
-                ) {
-                    Text("다시 촬영")
-                }
-                
-                // 홈으로 버튼
-                Button(
-                    onClick = onHomeClick
-                ) {
-                    Text("홈으로")
-                }
-            }
         }
     }
 }
+
+// dp 단위를 위한 import
+private val dp = androidx.compose.ui.unit.dp
 
 /**
  * 저장소 권한 확인 함수
