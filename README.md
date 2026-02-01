@@ -76,7 +76,8 @@ BILZ/
 │   │       │   │       ├── Theme.kt
 │   │       │   │       └── Type.kt
 │   │       │   └── util/
-│   │       │       └── ImageSaver.kt          # MediaStore 이미지 저장 유틸리티
+│   │       │       ├── ImageSaver.kt          # MediaStore 이미지 저장 유틸리티
+│   │       │       └── GoogleAuthManager.kt   # Google 로그인 관리 클래스
 │   │       ├── res/
 │   │       │   ├── values/
 │   │       │   │   ├── strings.xml
@@ -154,6 +155,11 @@ dependencies {
   - Pictures/BILZ 폴더에 이미지 저장
   - Android 10+ Scoped Storage 지원
   - 저장 완료/실패 화면 UI 구현
+- 🔐 Google 로그인 기능 구현 (Drive API용)
+  - GoogleAuthManager 클래스로 로그인 상태 관리
+  - DriveScopes.DRIVE_FILE 스코프 요청
+  - 저장 완료 화면에 Google Drive 업로드 버튼 추가
+  - 로그인 상태에 따른 자동 로그인/로그인 화면 표시
 
 ## 🤝 기여하기
 

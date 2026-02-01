@@ -32,9 +32,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,12 +64,15 @@ import com.bilz.app.ui.screens.FileNameInputScreen
 import com.bilz.app.ui.screens.HomeScreen
 import com.bilz.app.ui.screens.PermissionScreen
 import com.bilz.app.ui.theme.BILZTheme
+import com.bilz.app.util.GoogleAuthManager
+import com.bilz.app.util.GoogleSignInResult
 import com.bilz.app.util.ImageSaveResult
 import com.bilz.app.util.ImageSaver
 import com.canhub.cropper.CropImageContract
 import com.canhub.cropper.CropImageContractOptions
 import com.canhub.cropper.CropImageOptions
 import com.canhub.cropper.CropImageView
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import kotlinx.coroutines.launch
 
 /**
@@ -80,6 +85,7 @@ import kotlinx.coroutines.launch
  * 4. 시작 버튼 클릭 시 카메라 화면으로 이동
  * 5. 촬영 완료 후 이미지 자르기 화면 표시
  * 6. 자르기 완료 후 파일명 입력 및 로컬 저장
+ * 7. 저장 완료 후 Google Drive 업로드 (로그인 필요시 로그인 진행)
  */
 class MainActivity : ComponentActivity() {
     
@@ -141,6 +147,21 @@ sealed class AppScreen {
         val errorMessage: String,
         val croppedImageUri: Uri
     ) : AppScreen()
+    
+    /** Google 로그인 중 상태 */
+    data class SigningIn(
+        val savedUri: Uri,
+        val fileName: String,
+        val relativePath: String
+    ) : AppScreen()
+    
+    /** Google 로그인 완료 - Drive 업로드 준비 상태 */
+    data class ReadyToUpload(
+        val savedUri: Uri,
+        val fileName: String,
+        val relativePath: String,
+        val account: GoogleSignInAccount
+    ) : AppScreen()
 }
 
 /**
@@ -153,6 +174,12 @@ fun BilzApp() {
     // 현재 Context 가져오기
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    
+    // ============================================================
+    // Google Auth Manager
+    // ============================================================
+    
+    val googleAuthManager = remember { GoogleAuthManager(context) }
     
     // ============================================================
     // 권한 상태 관리
@@ -248,6 +275,54 @@ fun BilzApp() {
     }
     
     // ============================================================
+    // Google 로그인 런처 설정
+    // ============================================================
+    
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val screen = currentScreen
+        if (screen is AppScreen.SigningIn) {
+            // 로그인 결과 처리
+            when (val signInResult = googleAuthManager.handleSignInResult(result.data)) {
+                is GoogleSignInResult.Success -> {
+                    Log.d("MainActivity", "Google 로그인 성공: ${signInResult.account.email}")
+                    Toast.makeText(context, "${signInResult.account.email}으로 로그인됨", Toast.LENGTH_SHORT).show()
+                    currentScreen = AppScreen.ReadyToUpload(
+                        savedUri = screen.savedUri,
+                        fileName = screen.fileName,
+                        relativePath = screen.relativePath,
+                        account = signInResult.account
+                    )
+                }
+                is GoogleSignInResult.Cancelled -> {
+                    Log.d("MainActivity", "Google 로그인 취소됨")
+                    Toast.makeText(context, "로그인이 취소되었습니다", Toast.LENGTH_SHORT).show()
+                    // 저장 완료 화면으로 돌아가기
+                    currentScreen = AppScreen.SaveCompleted(
+                        savedUri = screen.savedUri,
+                        fileName = screen.fileName,
+                        relativePath = screen.relativePath
+                    )
+                }
+                is GoogleSignInResult.Failure -> {
+                    Log.e("MainActivity", "Google 로그인 실패: ${signInResult.message}")
+                    Toast.makeText(context, "로그인 실패: ${signInResult.message}", Toast.LENGTH_SHORT).show()
+                    // 저장 완료 화면으로 돌아가기
+                    currentScreen = AppScreen.SaveCompleted(
+                        savedUri = screen.savedUri,
+                        fileName = screen.fileName,
+                        relativePath = screen.relativePath
+                    )
+                }
+                is GoogleSignInResult.NeedSignIn -> {
+                    // 이 경우는 발생하지 않음 (이미 로그인 결과 처리 중)
+                }
+            }
+        }
+    }
+    
+    // ============================================================
     // 크롭 대기 상태에서 크롭 화면 자동 실행
     // ============================================================
     
@@ -311,6 +386,37 @@ fun BilzApp() {
                         errorMessage = result.message,
                         croppedImageUri = screen.croppedImageUri
                     )
+                }
+            }
+        }
+    }
+    
+    // ============================================================
+    // 로그인 상태에서 Google 로그인 화면 자동 실행
+    // ============================================================
+    
+    LaunchedEffect(currentScreen) {
+        val screen = currentScreen
+        if (screen is AppScreen.SigningIn) {
+            // 로그인 시도
+            when (val result = googleAuthManager.trySignIn()) {
+                is GoogleSignInResult.Success -> {
+                    // 이미 로그인되어 있음
+                    Log.d("MainActivity", "기존 로그인 계정 사용: ${result.account.email}")
+                    currentScreen = AppScreen.ReadyToUpload(
+                        savedUri = screen.savedUri,
+                        fileName = screen.fileName,
+                        relativePath = screen.relativePath,
+                        account = result.account
+                    )
+                }
+                is GoogleSignInResult.NeedSignIn -> {
+                    // 로그인 화면 실행
+                    Log.d("MainActivity", "로그인 화면 실행")
+                    googleSignInLauncher.launch(result.signInIntent)
+                }
+                else -> {
+                    // Failure, Cancelled는 trySignIn에서 발생하지 않음
                 }
             }
         }
@@ -433,6 +539,16 @@ fun BilzApp() {
                 SaveCompletedScreen(
                     fileName = screen.fileName,
                     relativePath = screen.relativePath,
+                    isSignedIn = googleAuthManager.isSignedIn(),
+                    signedInEmail = googleAuthManager.getEmail(),
+                    onUploadToDriveClick = {
+                        // Google Drive 업로드 시작 -> 로그인 확인
+                        currentScreen = AppScreen.SigningIn(
+                            savedUri = screen.savedUri,
+                            fileName = screen.fileName,
+                            relativePath = screen.relativePath
+                        )
+                    },
                     onHomeClick = {
                         currentScreen = AppScreen.Home
                     },
@@ -449,6 +565,39 @@ fun BilzApp() {
                     onRetryClick = {
                         // 파일명 입력 화면으로 돌아가기
                         currentScreen = AppScreen.CropCompleted(screen.croppedImageUri)
+                    },
+                    onHomeClick = {
+                        currentScreen = AppScreen.Home
+                    }
+                )
+            }
+            
+            // Google 로그인 중 화면
+            is AppScreen.SigningIn -> {
+                LoadingScreen(message = "Google 로그인 중...")
+            }
+            
+            // 업로드 준비 완료 화면
+            is AppScreen.ReadyToUpload -> {
+                ReadyToUploadScreen(
+                    fileName = screen.fileName,
+                    relativePath = screen.relativePath,
+                    accountEmail = screen.account.email ?: "알 수 없음",
+                    onUploadClick = {
+                        // TODO: 8단계에서 실제 업로드 구현
+                        Toast.makeText(
+                            context,
+                            "Google Drive 업로드 기능은 다음 단계에서 구현됩니다",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        currentScreen = AppScreen.Home
+                    },
+                    onCancelClick = {
+                        currentScreen = AppScreen.SaveCompleted(
+                            savedUri = screen.savedUri,
+                            fileName = screen.fileName,
+                            relativePath = screen.relativePath
+                        )
                     },
                     onHomeClick = {
                         currentScreen = AppScreen.Home
@@ -486,12 +635,15 @@ private fun LoadingScreen(
 }
 
 /**
- * 저장 완료 화면 Composable
+ * 저장 완료 화면 Composable (Google Drive 업로드 버튼 포함)
  */
 @Composable
 private fun SaveCompletedScreen(
     fileName: String,
     relativePath: String,
+    isSignedIn: Boolean,
+    signedInEmail: String?,
+    onUploadToDriveClick: () -> Unit,
     onHomeClick: () -> Unit,
     onTakeAnotherClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -577,9 +729,43 @@ private fun SaveCompletedScreen(
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             
-            // 버튼들
+            // Google Drive 업로드 버튼
+            Button(
+                onClick = onUploadToDriveClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CloudUpload,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = "Google Drive에 업로드",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    if (isSignedIn && signedInEmail != null) {
+                        Text(
+                            text = signedInEmail,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+            }
+            
+            // 다른 영수증 촬영 버튼
             Button(
                 onClick = onTakeAnotherClick,
                 modifier = Modifier
@@ -592,6 +778,147 @@ private fun SaveCompletedScreen(
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold
                     )
+                )
+            }
+            
+            OutlinedButton(
+                onClick = onHomeClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "홈으로",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 업로드 준비 완료 화면 Composable
+ */
+@Composable
+private fun ReadyToUploadScreen(
+    fileName: String,
+    relativePath: String,
+    accountEmail: String,
+    onUploadClick: () -> Unit,
+    onCancelClick: () -> Unit,
+    onHomeClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 클라우드 아이콘
+            Icon(
+                imageVector = Icons.Default.CloudUpload,
+                contentDescription = "업로드 준비",
+                modifier = Modifier.size(80.dp),
+                tint = MaterialTheme.colorScheme.secondary
+            )
+            
+            // 제목
+            Text(
+                text = "Google Drive 업로드",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            // 정보 카드
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // 로그인된 계정
+                    Text(
+                        text = "로그인 계정",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = accountEmail,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    // 업로드할 파일
+                    Text(
+                        text = "업로드할 파일",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = fileName,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // 업로드 버튼
+            Button(
+                onClick = onUploadClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CloudUpload,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "업로드 시작",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+            
+            OutlinedButton(
+                onClick = onCancelClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "취소",
+                    style = MaterialTheme.typography.titleMedium
                 )
             }
             
