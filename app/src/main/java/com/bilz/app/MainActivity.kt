@@ -206,6 +206,20 @@ fun BilzApp() {
     val googleAuthManager = remember { GoogleAuthManager(context) }
     
     // ============================================================
+    // 로그인된 Google 계정 상태 (앱 전체에서 유지)
+    // ============================================================
+    
+    var signedInAccount by remember { mutableStateOf<GoogleSignInAccount?>(null) }
+    
+    // 앱 시작 시 기존 로그인 상태 확인
+    LaunchedEffect(Unit) {
+        if (googleAuthManager.isSignedIn()) {
+            signedInAccount = googleAuthManager.getCurrentAccount()
+            Log.d("MainActivity", "기존 로그인 계정 복원: ${signedInAccount?.email}")
+        }
+    }
+    
+    // ============================================================
     // 권한 상태 관리
     // ============================================================
     
@@ -299,40 +313,42 @@ fun BilzApp() {
     }
     
     // ============================================================
-    // Google 로그인 런처 설정
+    // Google 로그인 런처 설정 (시작 버튼 클릭 시 사용)
     // ============================================================
+    
+    // 로그인 대기 상태 (로그인 완료 후 카메라로 이동하기 위한 플래그)
+    var waitingForSignIn by remember { mutableStateOf(false) }
     
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        val screen = currentScreen
-        if (screen is AppScreen.SigningIn) {
-            // 로그인 결과 처리
-            when (val signInResult = googleAuthManager.handleSignInResult(result.data)) {
-                is GoogleSignInResult.Success -> {
-                    Log.d("MainActivity", "Google 로그인 성공: ${signInResult.account.email}")
-                    // 로그인 성공 -> 바로 업로드 시작 (확인 화면 생략)
-                    currentScreen = AppScreen.Uploading(
-                        savedUri = screen.savedUri,
-                        fileName = screen.fileName,
-                        account = signInResult.account
-                    )
-                }
-                is GoogleSignInResult.Cancelled -> {
-                    Log.d("MainActivity", "Google 로그인 취소됨")
-                    Toast.makeText(context, "로그인 취소 - 로컬에만 저장됨", Toast.LENGTH_SHORT).show()
-                    // 카메라 화면으로 복귀
+        // 로그인 결과 처리
+        when (val signInResult = googleAuthManager.handleSignInResult(result.data)) {
+            is GoogleSignInResult.Success -> {
+                Log.d("MainActivity", "Google 로그인 성공: ${signInResult.account.email}")
+                // 로그인된 계정 저장
+                signedInAccount = signInResult.account
+                
+                // 시작 버튼에서 로그인 대기 중이었다면 카메라로 이동
+                if (waitingForSignIn) {
+                    waitingForSignIn = false
                     currentScreen = AppScreen.Camera
                 }
-                is GoogleSignInResult.Failure -> {
-                    Log.e("MainActivity", "Google 로그인 실패: ${signInResult.message}")
-                    Toast.makeText(context, "로그인 실패 - 로컬에만 저장됨", Toast.LENGTH_SHORT).show()
-                    // 카메라 화면으로 복귀
-                    currentScreen = AppScreen.Camera
-                }
-                is GoogleSignInResult.NeedSignIn -> {
-                    // 이 경우는 발생하지 않음 (이미 로그인 결과 처리 중)
-                }
+            }
+            is GoogleSignInResult.Cancelled -> {
+                Log.d("MainActivity", "Google 로그인 취소됨")
+                Toast.makeText(context, "로그인이 취소되었습니다", Toast.LENGTH_SHORT).show()
+                waitingForSignIn = false
+                // 홈 화면 유지
+            }
+            is GoogleSignInResult.Failure -> {
+                Log.e("MainActivity", "Google 로그인 실패: ${signInResult.message}")
+                Toast.makeText(context, "로그인 실패: ${signInResult.message}", Toast.LENGTH_SHORT).show()
+                waitingForSignIn = false
+                // 홈 화면 유지
+            }
+            is GoogleSignInResult.NeedSignIn -> {
+                // 이 경우는 발생하지 않음 (이미 로그인 결과 처리 중)
             }
         }
     }
@@ -396,13 +412,26 @@ fun BilzApp() {
             currentScreen = when (result) {
                 is ImageSaveResult.Success -> {
                     Log.d("MainActivity", "이미지 저장 성공: ${result.savedUri}")
-                    Toast.makeText(context, "로컬 저장 완료! 드라이브 업로드 중...", Toast.LENGTH_SHORT).show()
-                    // 저장 완료 후 자동으로 로그인/업로드 진행
-                    AppScreen.SigningIn(
-                        savedUri = result.savedUri,
-                        fileName = result.displayName,
-                        relativePath = result.relativePath
-                    )
+                    
+                    // 이미 로그인되어 있으면 바로 업로드, 아니면 로컬 저장만 완료
+                    val account = signedInAccount
+                    if (account != null) {
+                        Toast.makeText(context, "로컬 저장 완료! 드라이브 업로드 중...", Toast.LENGTH_SHORT).show()
+                        // 바로 업로드 시작 (로그인 화면 생략)
+                        AppScreen.Uploading(
+                            savedUri = result.savedUri,
+                            fileName = result.displayName,
+                            account = account
+                        )
+                    } else {
+                        // 로그인 안 됨 - 로컬 저장만 완료
+                        Toast.makeText(context, "로컬 저장 완료! (로그인 필요)", Toast.LENGTH_SHORT).show()
+                        AppScreen.SaveCompleted(
+                            savedUri = result.savedUri,
+                            fileName = result.displayName,
+                            relativePath = result.relativePath
+                        )
+                    }
                 }
                 is ImageSaveResult.Failure -> {
                     Log.e("MainActivity", "이미지 저장 실패: ${result.message}")
@@ -416,26 +445,27 @@ fun BilzApp() {
     }
     
     // ============================================================
-    // 로그인 상태에서 Google 로그인 화면 자동 실행
+    // 시작 버튼 클릭 핸들러 (로그인 확인 후 카메라로 이동)
     // ============================================================
     
-    LaunchedEffect(currentScreen) {
-        val screen = currentScreen
-        if (screen is AppScreen.SigningIn) {
+    val onStartClick: () -> Unit = {
+        // 이미 로그인되어 있으면 바로 카메라로 이동
+        if (signedInAccount != null) {
+            Log.d("MainActivity", "이미 로그인됨: ${signedInAccount?.email}, 카메라로 이동")
+            currentScreen = AppScreen.Camera
+        } else {
             // 로그인 시도
             when (val result = googleAuthManager.trySignIn()) {
                 is GoogleSignInResult.Success -> {
-                    // 이미 로그인되어 있음 -> 바로 업로드 시작
+                    // 이미 로그인되어 있음 -> 계정 저장 후 카메라로
                     Log.d("MainActivity", "기존 로그인 계정 사용: ${result.account.email}")
-                    currentScreen = AppScreen.Uploading(
-                        savedUri = screen.savedUri,
-                        fileName = screen.fileName,
-                        account = result.account
-                    )
+                    signedInAccount = result.account
+                    currentScreen = AppScreen.Camera
                 }
                 is GoogleSignInResult.NeedSignIn -> {
                     // 로그인 화면 실행
                     Log.d("MainActivity", "로그인 화면 실행")
+                    waitingForSignIn = true
                     googleSignInLauncher.launch(result.signInIntent)
                 }
                 else -> {
@@ -548,10 +578,9 @@ fun BilzApp() {
             // 홈 화면
             is AppScreen.Home -> {
                 HomeScreen(
-                    onStartClick = {
-                        // 카메라 화면으로 이동
-                        currentScreen = AppScreen.Camera
-                    }
+                    onStartClick = onStartClick,
+                    isSignedIn = signedInAccount != null,
+                    signedInEmail = signedInAccount?.email
                 )
             }
             

@@ -44,11 +44,15 @@ import com.bilz.app.ui.theme.BILZTheme
  * 중앙에 "시작" 버튼이 위치한 심플한 디자인입니다.
  * 
  * @param onStartClick 시작 버튼 클릭 시 실행되는 콜백
+ * @param isSignedIn Google 로그인 여부
+ * @param signedInEmail 로그인된 이메일 (null이면 미로그인)
  * @param modifier 레이아웃 수정자
  */
 @Composable
 fun HomeScreen(
     onStartClick: () -> Unit,
+    isSignedIn: Boolean = false,
+    signedInEmail: String? = null,
     modifier: Modifier = Modifier
 ) {
     // ============================================================
@@ -134,10 +138,29 @@ fun HomeScreen(
             
             // 버튼 안내 텍스트
             Text(
-                text = "시작하려면 버튼을 누르세요",
+                text = if (isSignedIn) "시작하려면 버튼을 누르세요" else "로그인 후 시작됩니다",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
+            
+            // 로그인 상태 표시
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            if (isSignedIn && signedInEmail != null) {
+                // 로그인됨 - 계정 표시
+                Text(
+                    text = "✓ $signedInEmail",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF4CAF50) // 초록색
+                )
+            } else {
+                // 미로그인 - 안내 메시지
+                Text(
+                    text = "Google 계정 로그인이 필요합니다",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+            }
         }
     }
 }
