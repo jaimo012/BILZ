@@ -101,6 +101,9 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    
+    // Material Icons Extended - 추가 아이콘 (CameraAlt, Folder 등)
+    implementation(libs.androidx.material.icons.extended)
 
     // ============================================================
     // CameraX (카메라 기능)
