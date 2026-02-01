@@ -14,8 +14,8 @@ android {
     // 앱의 고유 식별자 (패키지명)
     namespace = "com.bilz.app"
     
-    // 컴파일에 사용할 Android SDK 버전
-    compileSdk = 34
+    // 컴파일에 사용할 Android SDK 버전 (Android 15)
+    compileSdk = 35
 
     defaultConfig {
         // Google Play Store에서 앱을 식별하는 고유 ID
@@ -24,8 +24,8 @@ android {
         // 앱이 지원하는 최소 Android 버전 (Android 8.0 Oreo)
         minSdk = 26
         
-        // 앱이 테스트된 최신 Android 버전
-        targetSdk = 34
+        // 앱이 테스트된 최신 Android 버전 (Android 15)
+        targetSdk = 35
         
         // 앱 버전 코드 (업데이트 시 증가해야 함)
         versionCode = 1
