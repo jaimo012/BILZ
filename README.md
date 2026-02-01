@@ -2,6 +2,8 @@
 
 > 카메라, 이미지 처리, Google Drive 연동 기능을 갖춘 Android 앱
 
+📖 **[개발 과정 문서 (DEVELOPMENT.md)](./DEVELOPMENT.md)** - 기획, 개발 과정, 오류 대응, 배운 교훈
+
 ## 📱 프로젝트 개요
 
 BILZ는 Kotlin과 Jetpack Compose를 사용하여 개발된 Android 앱입니다.
